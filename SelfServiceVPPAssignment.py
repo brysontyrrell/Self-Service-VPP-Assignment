@@ -1,7 +1,7 @@
 #!/usr/bin/python2.7
 
 __author__ = "Bryson Tyrrell"
-__version__ = "1.0"
+__version__ = "1.1"
 
 import ast
 import base64
@@ -10,7 +10,6 @@ from Foundation import NSAppleScript
 import sys
 import urllib
 import urllib2
-import xml.etree.cElementTree as etree
 
 # Option to read JSS URL from 'com.jamfsoftware.jamf.plist' 
 # plist_path = '/Library/Preferences/com.jamfsoftware.jamf.plist'
@@ -76,17 +75,12 @@ class JSS:
                     elif line.rstrip():
                         applist += line.strip(';')[1:]
                 break
-        
+
         return ast.literal_eval(applist)
     
-    def assign_app(self, user_id, ext_att_id):
+    def assign_app(self, username, ext_att_id):
         xml = "<user><extension_attributes><extension_attribute><id>{0}</id><value>Assigned</value></extension_attribute></extension_attributes></user>".format(ext_att_id)
-        self.api_request(self.server + '/JSSResource/users/id/' + user_id, xml)
-    
-    def get_user(self, username):
-        r = self.api_request(self.server + '/JSSResource/users/name/' + username)
-        root = etree.fromstring(r.read())
-        return root.find('id').text
+        self.api_request(self.server + '/JSSResource/users/name/' + username, xml)
 
 
 def display(message, icon):
@@ -113,18 +107,26 @@ def create_ticket():
 def main():
     jss = JSS(jssurl, jssusername, jsspassword)
     content = jss.vpp_content(contentsearchid)
+    matched = False
     for i in content:
         if i[0] == appname:
+            matched = True
             if i[-1] > 0:
                 print("There are available seats of the app.")
-                userid = jss.get_user(selfserviceuser)
                 print("Assigning the app.")
-                jss.assign_app(userid, userextatt)
+                jss.assign_app(selfserviceuser, userextatt)
                 display('{0} has been assigned to you!\n\nFind it in your App Store purchase history.'.format(appname), 1)
             else:
                 print("There are not enough available seats of the app.")
                 create_ticket()
-                display('{0} could not be assigned at this time.\n\nA ticket has been created on your behalf. You will be contacted by IT shortly.'.format(appname), 2)
+                display('{0} could not be assigned at this time.\n\nA ticket has been created on your behalf.\nYou will be contacted by IT shortly.'.format(appname), 2)
+
+            break
+
+    if not matched:
+        display("The app {0} could not be found.\n\nA ticket has been created on your behalf.\nYou will be contacted by IT shortly.".format(appname), 0)
+        create_ticket()
+        sys.exit(1)
 
 
 if __name__ == '__main__':
